@@ -9,6 +9,7 @@ import (
 
 type Request struct {
 	RequestLine RequestLine
+	state requestState
 }
 
 type RequestLine struct {
@@ -17,35 +18,68 @@ type RequestLine struct {
 	Method string
 }
 
+type requestState int
+
+const (
+	requestStateInitialized requestState = iota
+	requestStateDone
+)
+
 const crlf = "\r\n"
 
+const bufferSize = 8
+
 func RequestFromReader(reader io.Reader) (*Request, error) {
-	data, err := io.ReadAll(reader)
-	if err != nil {
-		return nil, err
+	buf := make([]byte, bufferSize)
+	readToIndex := 0
+
+	r := &Request{state: requestStateInitialized}
+
+	for r.state != requestStateDone {
+		if readToIndex == len(buf) {
+			newBuf := make([]byte, len(buf) * 2)
+			copy(newBuf, buf)
+			buf = newBuf
+		}
+
+		n, err := reader.Read(buf[readToIndex:])
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, err
+		}
+		readToIndex += n
+
+		parsed, err := r.parse(buf[:readToIndex])
+		if err != nil {
+			return nil, err
+		}
+
+		if parsed > 0 {
+			copy(buf, buf[parsed:readToIndex])
+			readToIndex -= parsed
+		}
 	}
 
-	reqLine, err := parseRequestLine(data)
-	if err != nil {
-		return nil, err
+	if r.state != requestStateDone {
+		return nil, fmt.Errorf("incomplete request: parser did not reach done state")
 	}
 
-	return &Request{
-		RequestLine: *reqLine,
-	}, nil
+	return r, nil
 }
 
-func parseRequestLine(data []byte) (*RequestLine, error) {
+func parseRequestLine(data []byte) (*RequestLine, int, error) {
 	idx := bytes.Index(data, []byte(crlf))
 	if idx == -1 {
-		return nil, fmt.Errorf("could not find CRLF in request-line")
+		return nil, 0, nil
 	}
 	requestLineText := string(data[:idx])
 	requestLine, err := requestLineFromString(requestLineText)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return requestLine, nil
+	return requestLine, idx + len(crlf), nil
 }
 
 func requestLineFromString(str string) (*RequestLine, error) {
@@ -82,4 +116,27 @@ func requestLineFromString(str string) (*RequestLine, error) {
 		RequestTarget: requestTarget,
 		Method: method,
 	}, nil
+}
+
+func (r *Request) parse(data []byte) (int, error) {
+	switch r.state {
+	case requestStateInitialized:
+		reqLine, n, err := parseRequestLine(data)
+		if err != nil {
+			return 0, err
+		}
+		if n == 0 {
+			return 0, nil
+		}
+
+		r.RequestLine = *reqLine
+		r.state = requestStateDone
+		return n, nil
+
+	case requestStateDone:
+		return 0, fmt.Errorf("error: tyring to read data in a done state")
+
+	default:
+		return 0, fmt.Errorf("error: unknown state %d", r.state)
+	}
 }
