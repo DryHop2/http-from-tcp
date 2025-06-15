@@ -1,12 +1,11 @@
 package main
 
 import (
-	"errors"
 	"fmt"
+	"httpfromtcp/internal/request"
 	"io"
 	"log"
 	"net"
-	"strings"
 )
 
 func main() {
@@ -24,45 +23,23 @@ func main() {
 		}
 		fmt.Println("Connection accepted")
 
-		for line := range getLinesChannel(conn) {
-			fmt.Println(line)
-		}
-	fmt.Println("Connection closed")
+		go handleConnection(conn)
 	}
 }
 
-func getLinesChannel(f io.ReadCloser) <- chan string {
-	lines := make(chan string)
+func handleConnection(conn io.ReadCloser) {
+	defer conn.Close()
 
-	go func() {
-		defer f.Close()
-		defer close(lines)
+	req, err := request.RequestFromReader(conn)
+	if err != nil {
+		fmt.Println("Failed to parse request:", err)
+		return
+	}
 
-		var currentLine string
-		buffer := make([]byte, 8)
-		
-		for {
-			bytesRead, err := f.Read(buffer)
-			if err != nil {
-				if currentLine != "" {
-					lines <- currentLine
-				}
-				if errors.Is(err, io.EOF) {
-					break
-				}
-				break
-			}
-			chunk := string(buffer[:bytesRead])
-			parts := strings.Split(chunk, "\n")
-			for i, part := range parts {
-				if i < len(parts) - 1 {
-					lines <- currentLine + part
-					currentLine = ""
-				} else {
-					currentLine += part
-				}
-			}
-		}
-	}()
-	return lines
+	fmt.Println("Request line:")
+	fmt.Println("- Method:", req.RequestLine.Method)
+	fmt.Println("- Target:", req.RequestLine.RequestTarget)
+	fmt.Println("- Version:", req.RequestLine.HttpVersion)
+
+	fmt.Println("Connection closed")
 }
