@@ -56,8 +56,12 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 
 	key := strings.ToLower(rawKey)
 	value := strings.TrimSpace(line[colonIdx + 1:])
-
-	h[key] = value
+	currentValue, exists := h[key]
+	if exists {
+		h[key] = currentValue + ", " + value
+	} else {
+		h[key] = value
+	}
 
 	return idx + len(crlf), false, nil
 }
