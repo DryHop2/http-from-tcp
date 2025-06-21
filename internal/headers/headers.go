@@ -37,13 +37,13 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 		return len(crlf), true, nil
 	}
 
-	line := string(data[:idx])
-	colonIdx := strings.Index(line, ":")
-	if colonIdx == -1 {
+	line := data[:idx]
+	parts := bytes.SplitN(line, []byte(":"), 2)
+	if len(parts) != 2 {
 		return 0, false, fmt.Errorf("malformed header line (no colon): %q", line)
 	}
 
-	rawKey := line[:colonIdx]
+	rawKey := string(parts[0])
 	if strings.TrimSpace(rawKey) != rawKey {
 		return 0, false, fmt.Errorf("invalid header: space before colon")
 	}
@@ -55,15 +55,19 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	}
 
 	key := strings.ToLower(rawKey)
-	value := strings.TrimSpace(line[colonIdx + 1:])
-	currentValue, exists := h[key]
-	if exists {
-		h[key] = currentValue + ", " + value
+	value := strings.TrimSpace(string(parts[1]))
+	h.Set(key, value)
+
+	return idx + len(crlf), false, nil
+}
+
+func (h Headers) Set(key, value string) {
+	key = strings.ToLower(key)
+	if existing, ok := h[key]; ok {
+		h[key] = existing + ", " + value
 	} else {
 		h[key] = value
 	}
-
-	return idx + len(crlf), false, nil
 }
 
 func isValidHeaderField(s string) bool {
