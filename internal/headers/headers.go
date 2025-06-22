@@ -70,6 +70,11 @@ func (h Headers) Set(key, value string) {
 	}
 }
 
+func (h Headers) Get(key string) string {
+	key = strings.ToLower(key)
+	return h[key]
+}
+
 func isValidHeaderField(s string) bool {
 	for i := 0; i < len(s); i++ {
 		if s[i] >= 128 || !tcharTable[s[i]] {
