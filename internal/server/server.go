@@ -57,8 +57,4 @@ func (s *Server) handle(conn net.Conn) {
 		log.Printf("error writing headers: %v", err)
 		return
 	}
-	if _, err := fmt.Fprint(conn, "\r\n"); err != nil {
-		log.Printf("error writing CRLF: %v", err)
-		return
-	}
 }
