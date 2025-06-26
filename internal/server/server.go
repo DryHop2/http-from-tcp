@@ -1,7 +1,9 @@
 package server
 
 import (
+	"bytes"
 	"fmt"
+	"httpfromtcp/internal/request"
 	"httpfromtcp/internal/response"
 	"log"
 	"net"
@@ -11,14 +13,18 @@ import (
 type Server struct {
 	listener net.Listener
 	closed atomic.Bool
+	handler Handler
 }
 
-func Serve(port int) (*Server, error) {
+func Serve(port int, handler Handler) (*Server, error) {
 	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return nil, err
 	}
-	s := &Server{listener: ln}
+	s := &Server{
+		listener: ln,
+		handler: handler,
+	}
 	go s.listen()
 	return s, nil
 }
@@ -45,16 +51,36 @@ func (s *Server) listen() {
 func (s *Server) handle(conn net.Conn) {
 	defer conn.Close()
 
-	const body = ""
-	status := response.StatusOK
-	headers := response.GetDefaultHeaders(len(body))
+	req, err := request.RequestFromReader(conn)
+	if err != nil {
+		herr := &HandlerError{
+			StatusCode: response.StatusBadRequest,
+			Message: "Invalid Request\n",
+		}
+		WriteHandlerError(conn, herr)
+		return
+	}
 
-	if err := response.WriteStatusLine(conn, status); err != nil {
-		log.Printf("error writing status line: %v", err)
+	var respBody bytes.Buffer
+
+	herr := s.handler(&respBody, req)
+	if herr != nil {
+		WriteHandlerError(conn, herr)
+		return
+	}
+
+	// bodyBytes := respBody.Bytes()
+	headers := response.GetDefaultHeaders(respBody.Len())
+
+	if err := response.WriteStatusLine(conn, response.StatusOK); err != nil {
+		log.Printf("failed to write status line: %v", err)
 		return
 	}
 	if err := response.WriteHeaders(conn, headers); err != nil {
-		log.Printf("error writing headers: %v", err)
+		log.Printf("failed to write headers: %v", err)
 		return
+	}
+	if _, err := respBody.WriteTo(conn); err != nil {
+		log.Printf("failed to write body: %v", err)
 	}
 }
