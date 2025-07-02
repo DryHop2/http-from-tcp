@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bytes"
 	"fmt"
 	"httpfromtcp/internal/request"
 	"httpfromtcp/internal/response"
@@ -53,34 +52,22 @@ func (s *Server) handle(conn net.Conn) {
 
 	req, err := request.RequestFromReader(conn)
 	if err != nil {
-		herr := &HandlerError{
-			StatusCode: response.StatusBadRequest,
-			Message: "Invalid Request\n",
-		}
-		WriteHandlerError(conn, herr)
+		writer := response.NewWriter(conn)
+		writer.WriteStatusLine(response.StatusBadRequest)
+		writer.Header.Set("Content-Type", "text/html")
+		writer.WriteHeaders()
+		writer.WriteBody([]byte(`<html>
+									<head>
+										<title>400 Bad Request</title>
+									</head>
+									<body>
+										<h1>Bad Request</h1>
+										<p>Your request honestly kinda sucked.</p>
+									</body>
+									</html>`))
 		return
 	}
 
-	var respBody bytes.Buffer
-
-	herr := s.handler(&respBody, req)
-	if herr != nil {
-		WriteHandlerError(conn, herr)
-		return
-	}
-
-	// bodyBytes := respBody.Bytes()
-	headers := response.GetDefaultHeaders(respBody.Len())
-
-	if err := response.WriteStatusLine(conn, response.StatusOK); err != nil {
-		log.Printf("failed to write status line: %v", err)
-		return
-	}
-	if err := response.WriteHeaders(conn, headers); err != nil {
-		log.Printf("failed to write headers: %v", err)
-		return
-	}
-	if _, err := respBody.WriteTo(conn); err != nil {
-		log.Printf("failed to write body: %v", err)
-	}
+	writer := response.NewWriter(conn)
+	s.handler(writer, req)
 }

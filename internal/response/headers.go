@@ -18,7 +18,7 @@ func GetDefaultHeaders(contentLen int) headers.Headers {
 	return h
 }
 
-func WriteHeaders(w io.Writer, headers headers.Headers) error {
+func writeHeadersTo(w io.Writer, headers headers.Headers) error {
 	for key, value := range headers {
 		_, err := fmt.Fprintf(w, "%s: %s\r\n", key, value)
 		if err != nil {

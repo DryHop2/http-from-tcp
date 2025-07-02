@@ -29,7 +29,7 @@ func getStatusLine(statusCode StatusCode) string {
 	return fmt.Sprintf("HTTP/1.1 %d %s\r\n", statusCode, reason)
 }
 
-func WriteStatusLine(w io.Writer, statusCode StatusCode) error {
+func writeStatusLineTo(w io.Writer, statusCode StatusCode) error {
 	_, err := fmt.Fprint(w, getStatusLine(statusCode))
 	return err
 }
