@@ -102,6 +102,31 @@ func main() {
 			w.Header = h
 			w.WriteHeaders()
 			w.WriteBody(body)
+		case "/video":
+			if req.RequestLine.Method != "GET" {
+				w.WriteStatusLine(response.StatusBadRequest)
+				w.Header.Override("Content-Type", "text/plain")
+				w.WriteHeaders()
+				w.WriteBody([]byte("Only GET is allowed."))
+				return
+			}
+
+			data, err := os.ReadFile("assets/vim.mp4")
+			if err != nil {
+				w.WriteStatusLine(response.StatusInternalServerError)
+				w.Header.Override("Content-Type", "text/plain")
+				w.WriteHeaders()
+				w.WriteBody([]byte("Failed to load video file."))
+				return
+			}
+
+			w.WriteStatusLine(response.StatusOK)
+			h := response.GetDefaultHeaders(len(data))
+			h.Override("Content-Type", "video/mp4")
+			w.Header = h
+			w.WriteHeaders()
+			w.WriteBody(data)
+			return
 		default:
 			body := []byte(`<html>
 								<head>
