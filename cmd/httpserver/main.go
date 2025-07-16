@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"httpfromtcp/internal/request"
 	"httpfromtcp/internal/response"
 	"httpfromtcp/internal/server"
@@ -34,15 +36,19 @@ func main() {
 			w.WriteStatusLine(response.StatusOK)
 			h := response.GetDefaultHeaders(0)
 			h.Override("Transfer-Encoding", "chunked")
+			h.Override("Trailer", "X-Content-SHA256, X-Content-Length")
 			h.Remove("Content-Length")
 			w.Header = h
 			w.WriteHeaders()
 
 			buf := make([]byte, 1024)
+			var fullBody []byte
 			for {
 				n, readErr := resp.Body.Read(buf)
 				if n > 0 {
-					_, wErr := w.WriteChunkedBody(buf[:n])
+					chunk := buf[:n]
+					fullBody = append(fullBody, chunk...)
+					_, wErr := w.WriteChunkedBody(chunk)
 					if wErr != nil {
 						break
 					}
@@ -55,6 +61,12 @@ func main() {
 				}
 			}
 			w.WriteChunkedBodyDone()
+
+			sum := sha256.Sum256(fullBody)
+			trailerHeaders := response.NewHeaders()
+			trailerHeaders.Set("X-Content-SHA256", fmt.Sprintf("%x", sum))
+			trailerHeaders.Set("X-Content-Length", fmt.Sprintf("%d", len(fullBody)))
+			w.WriteTrailers(trailerHeaders)
 			return
 		}
 		switch req.RequestLine.RequestTarget {

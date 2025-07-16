@@ -28,3 +28,7 @@ func writeHeadersTo(w io.Writer, headers headers.Headers) error {
 	_, err := fmt.Fprintf(w, "\r\n")
 	return err
 }
+
+func NewHeaders() headers.Headers {
+	return headers.NewHeaders()
+}
