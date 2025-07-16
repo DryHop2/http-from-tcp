@@ -81,15 +81,33 @@ func (w *Writer) WriteChunkedBody(p []byte) (int, error) {
 }
 
 func (w *Writer) WriteChunkedBodyDone() (int, error) {
+	err := w.WriteChunkedBodyDoneWithTrailers(headers.NewHeaders())
+	return 0, err
+}
+
+func (w *Writer) WriteChunkedBodyDoneWithTrailers(h headers.Headers) error {
 	if w.state != stateHeadersWritten {
-		return 0, fmt.Errorf("must write headers before finishing chunked body")
+		return fmt.Errorf("must write headers before finishing chunked body")
 	}
-	n, err := w.conn.Write([]byte("0\r\n\r\n"))
+	_, err := w.conn.Write([]byte("0\r\n"))
 	if err != nil {
-		return n, err
+		return err
 	}
+
+	for k, v := range h {
+		_, err := fmt.Fprintf(w.conn, "%s: %s\r\n", k, v)
+		if err != nil {
+			return err
+		}
+	}
+
+	_, err = w.conn.Write([]byte("\r\n"))
+	if err != nil {
+		return err
+	}
+
 	w.state = stateBodyWritten
-	return n, nil
+	return nil
 }
 
 func (w *Writer) WriteTrailers(h headers.Headers) error {

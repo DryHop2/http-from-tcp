@@ -60,13 +60,13 @@ func main() {
 					break
 				}
 			}
-			w.WriteChunkedBodyDone()
+			//w.WriteChunkedBodyDone()
 
 			sum := sha256.Sum256(fullBody)
 			trailerHeaders := response.NewHeaders()
 			trailerHeaders.Set("X-Content-SHA256", fmt.Sprintf("%x", sum))
 			trailerHeaders.Set("X-Content-Length", fmt.Sprintf("%d", len(fullBody)))
-			w.WriteTrailers(trailerHeaders)
+			w.WriteChunkedBodyDoneWithTrailers(trailerHeaders)
 			return
 		}
 		switch req.RequestLine.RequestTarget {
