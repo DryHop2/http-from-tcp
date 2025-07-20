@@ -60,7 +60,6 @@ func main() {
 					break
 				}
 			}
-			//w.WriteChunkedBodyDone()
 
 			sum := sha256.Sum256(fullBody)
 			trailerHeaders := response.NewHeaders()
